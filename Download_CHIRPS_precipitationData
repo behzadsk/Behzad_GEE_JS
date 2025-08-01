@@ -1,0 +1,47 @@
+// Import the IMERG dataset.
+
+// Define the time range and region of interest.
+var startDate = ee.Date('2024-05-01');
+var endDate = ee.Date('2024-09-30');
+
+
+// Filter the dataset based on the time and region.
+var Precipitation = ee.ImageCollection("UCSB-CHG/CHIRPS/DAILY")
+  .filterDate(startDate, endDate)
+  .filterBounds(region)
+  .select('precipitation');
+
+// Print the filtered collection.
+print(Precipitation);
+//Map.addLayer(imergFiltered, {palette: ['green', 'blue', 'yellow', 'red'] }, 'GPM Filtered')
+var Boundarystyling = {color:'Black', fillColor:'#ffffff00'}
+Map.addLayer(region.style(Boundarystyling),{}, 'Study Area')
+
+var studyAreaPrecipitation = Precipitation.sum().clip(region)
+print('Study Area Precipitation', studyAreaPrecipitation)
+Map.addLayer(studyAreaPrecipitation, {palette: ['green', 'blue', 'yellow', 'red'] }, 'GPM StudyArea Precipitation')
+
+
+
+// Create a time series chart.
+var chart = ui.Chart.image.seriesByRegion({
+  imageCollection: studyAreaPrecipitation,
+  regions: region,
+  reducer: ee.Reducer.mean(),
+  band: 'precipitation',
+  scale: 5566,
+  xProperty: 'system:time_start'
+});
+
+// Display the chart.
+print(chart);
+
+
+
+Export.image.toDrive({
+  image: studyAreaPrecipitation,
+  description: 'GPM_precipitation',
+  scale: 5566, // Use a scale appropriate for the resolution (0.1 degrees)
+  region: region,
+  maxPixels: 1e13 // Adjust as needed based on the size of your region
+});

@@ -1,0 +1,60 @@
+
+
+    // defining the image collection we are working with
+var image = ee.ImageCollection("MODIS/061/MOD09A1")
+    // We will then include a filter to get only images in the date range we are interested in
+.filterDate("2024-07-01", "2024-07-30")
+    // Next we will also sort the collection by a metadata property, in our case cloud cover is a very useful one
+.sort("CLOUD_COVERAGE_ASSESSMENT")
+    //we will select the first image out of this collection - i.e. the most cloud free image in the date range
+.first();
+
+    //  print the image to the console.
+print("A MODIS Scene:", image);
+
+    // Define visualization parameters for true colour Combination.
+var trueColour = {
+        bands: ["sur_refl_b01", "sur_refl_b04", "sur_refl_b03"],
+        min: 0,
+        max: 3000
+        };
+
+  // Add the image to the map, using the visualization parameters.
+Map.addLayer(image.clip(studyArea), trueColour, "true-colour MODIS image");
+
+
+  //Define variable NDSI from equation
+var NDSI = image.expression(
+        "(Green - SWIR) / (Green + SWIR)",
+        {
+          Green: image.select("sur_refl_b04"),    //  Green
+          SWIR: image.select("sur_refl_b06"),    // SWIR
+        });
+  // Add the image to the map, using the visualization parameters.
+Map.addLayer(NDSI, {min: 0, max: 1}, "NDSI");
+
+
+  //cliping image for my study area
+var clippedINDSI = NDSI.clip(studyArea);
+
+  // Add the image to the map, using the visualization parameters.
+Map.addLayer(clippedINDSI, {min: 0, max: 1, palette: ['black', 'white']}, "Study Area NDSI")
+
+
+//Exporting data into Drive 
+// Define the export parameters
+var exportData = {
+  image: clippedINDSI,
+  description: 'NDSI for Himalayan Range for Jan-2023',
+  // folder: 'HimalayanNDSi', 
+  scale: 500, 
+  region: studyArea,
+  maxPixels: 1e13 
+};
+
+  // Export the image to Google Drive
+Export.image.toDrive(exportData)
+
+
+
+

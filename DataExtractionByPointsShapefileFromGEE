@@ -1,0 +1,40 @@
+
+Map.centerObject(aoi);
+Map.addLayer(aoi);
+
+// Daily time series rainfall data 
+var rainfall = ee.ImageCollection('UCSB-CHG/CHIRPS/DAILY')
+                .select('precipitation')
+                .filterDate('2000-01-01', '2000-12-31');
+
+// Set up the projection from the first image
+var proj = ee.Image(rainfall.first()).projection();
+
+// Extract daily precipitation values for each point
+var dailyPrecipitation = rainfall.map(function(img) {
+  var date = ee.Date(img.get('system:time_start'));
+  var features = aoi.map(function(f) {
+    return f.set({
+      'date': date,  // Set the date 
+      'precipitation': img.reduceRegion({
+        reducer: ee.Reducer.sum(),
+        geometry: f.geometry(),
+        scale: 5000,
+        maxPixels: 1e13
+      }).get('precipitation')
+    });
+  });
+  return features;
+}).flatten();
+
+// Print the first 24 rows of daily precipitation data to check
+print(dailyPrecipitation.limit(24));
+
+// Export the FeatureCollection as a CSV
+Export.table.toDrive({
+  collection: dailyPrecipitation, 
+  description: 'Daily_Rainfall',
+  fileFormat: 'CSV'
+});
+
+print("Export Daily Precipitation");

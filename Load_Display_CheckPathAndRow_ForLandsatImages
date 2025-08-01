@@ -1,0 +1,56 @@
+
+
+
+// Load the Landsat image collection and apply general filters
+var dataset = ee.ImageCollection(LC8)
+  .filterBounds(studyArea)
+  .filterDate('2024-06-01', '2024-09-30')
+  .filterMetadata('CLOUD_COVER', 'less_than', 10); // Filter by cloud cover < 10%
+
+
+// Function to filter and sort images by a target ID and cloud cover
+function filterAndSortByCloud(targetID) {
+  return dataset
+    .filter(ee.Filter.stringContains('system:index', targetID))
+    .sort('CLOUD_COVER');
+}
+
+print(dataset)
+
+var studyArea
+
+Map.addLayer(dataset, {bands: ['B4', 'B3', 'B2'], min: 0, max: 255}, 'Composite of Sorted Images by Cloud Cover');
+
+
+
+// Apply the function to each series and combine the results
+var images1 = filterAndSortByCloud('148035');
+var images2 = filterAndSortByCloud('149034');
+var images3 = filterAndSortByCloud('150034');
+var images4 = filterAndSortByCloud('150035');
+var images5 = filterAndSortByCloud('149035');
+
+// Merge all sorted collections into one
+var sortedImages = images1.merge(images2)
+                               .merge(images3)
+                               .merge(images4)
+                               .merge(images5);
+
+// Create a mosaic from the sorted images and clip to the study area
+var composite = sortedImages.mosaic().clip(studyArea);
+
+// Ensure all bands are cast to Uint16 to avoid data type conflicts
+var compositeUint16 = composite.toUint16();
+
+// Display the composite of sorted images
+Map.addLayer(compositeUint16, {bands: ['B4', 'B3', 'B2'], min: 0, max: 255}, 'Composite of Sorted Images by Cloud Cover');
+
+// Export the composite to Google Drive
+Export.image.toDrive({
+  image: compositeUint16,
+  description: 'Composite_Image', 
+  region: studyArea,
+  scale: 30, 
+  crs: 'EPSG:4326', 
+  maxPixels: 1e13 
+});

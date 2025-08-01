@@ -1,0 +1,44 @@
+
+// Import the GCN250 Images 
+var GCN250_Average =  ee.Image("users/jaafarhadi/GCN250/GCN250Average").select('b1').rename('average');
+var GCN250_Dry =  ee.Image("users/jaafarhadi/GCN250/GCN250Dry").select('b1').rename('dry');
+var GCN250_Wet = ee.Image("users/jaafarhadi/GCN250/GCN250Wet").select('b1').rename('wet');
+
+// visualize the Dry GCN dataset
+var vis = {
+  min:40, 
+  max:75, 
+  palette: ['Red','SandyBrown','Yellow','LimeGreen', 'Blue','DarkBlue']
+  
+};
+
+Map.addLayer(GCN250_Average, vis, 'CN Average');
+
+Map.addLayer(GCN250_Dry, vis, 'CN Dry');
+
+Map.addLayer(GCN250_Wet, vis, 'CN Wet');
+
+
+Export.image.toDrive({
+  image:GCN250_Average , 
+  description:'GCN250_Average' , 
+  scale: 250 , 
+  crs: 'EPSG:4326' , 
+  maxPixels: 1e13
+});
+
+Export.image.toDrive({
+  image:GCN250_Dry , 
+  description:'GCN250_Dry' , 
+  scale: 250 , 
+  crs: 'EPSG:4326' , 
+  maxPixels: 1e13
+});
+
+Export.image.toDrive({
+  image:GCN250_Wet , 
+  description:'GCN250_Wet' , 
+  scale: 250 , 
+  crs: 'EPSG:4326' , 
+  maxPixels: 1e13
+});

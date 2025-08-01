@@ -1,0 +1,26 @@
+
+
+var dataset = ee.ImageCollection("ESA/WorldCover/v200")
+
+var landcover = dataset.select('Map').mosaic();
+
+// Define the grassland class value
+var grassLandValue = 30;
+
+// Create a mask where grasslands are represented by the value 30
+var grassLands = landcover.eq(grassLandValue);
+
+// Apply the mask to the dataset to extract grassland areas
+var grassLandCover = landcover.updateMask(grassLands);
+var grassLandCover = grassLandCover.clip(Pakistan)
+// Display the original land cover map
+Map.addLayer(landcover, {}, 'Original Landcover');
+
+// Display the extracted grasslands
+Map.addLayer(grassLandCover, {min: 30, max: 30, palette: ['green']}, 'Grasslands');
+
+// Center the map
+Map.centerObject(Pakistan, 6);
+
+Export.image.toDrive({image:grassLandCover, description: 'grassLandCover',  region:Pakistan, scale:10, crs:'EPSG:4326', maxPixels:1e13})
+

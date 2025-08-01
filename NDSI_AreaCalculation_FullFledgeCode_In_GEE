@@ -1,0 +1,143 @@
+// Define an equal-area projection (e.g., UTM Zone 43N, EPSG:32643)
+var projection = ee.Projection('EPSG:32643');
+
+// Function to calculate the area of each polygon
+function calculatePolygonArea(feature) {
+  var reprojectedGeometry = feature.geometry({maxError: 1}).transform(projection, 1);
+  var areaMeters = reprojectedGeometry.area({maxError: 1});
+  var areaKilometers = areaMeters.divide(1e6);
+  return feature.set({
+    area_sq_m: areaMeters,
+    area_sq_km: areaKilometers
+  });
+}
+
+// Apply the function to each feature in the FeatureCollection
+var aoiWithArea = aoi.map(calculatePolygonArea);
+print('Watersheds with calculated areas:', aoiWithArea);
+
+// Export the results to a CSV file
+Export.table.toDrive({
+  collection: aoiWithArea,
+  description: 'WatershedAreas',
+  fileFormat: 'CSV',
+  selectors: ['area_sq_m', 'area_sq_km']
+});
+
+
+
+
+// Load Landsat 7 imagery and filter by date and cloud cover
+var landsat = ee.ImageCollection(LC5)
+  .filterBounds(aoi)
+  .filterDate('2000-01-01', '2000-01-30')
+  .filter(ee.Filter.lt('CLOUD_COVER', 5))
+  .mean();
+
+// Compute the Normalized Difference Snow Index (NDSI)
+var ndsi = landsat.normalizedDifference(['B2', 'B5']).rename('NDSI').clip(aoi);
+
+Map.addLayer(ndsi, {min: -1, max: 1}, 'NDSI');
+
+// Apply thresholding (0.27) and classify pixels into snow (2) and non-snow (1)
+var snowClass = ndsi.gt(0.27).multiply(1).add(1);
+
+// Add classified image to the map
+Map.addLayer(snowClass, {min: 1, max: 2, palette: ['green', 'white']}, 'Snow Classification');
+
+// Calculate the area under snow pixels and non-snow pixels
+var pixelArea = ee.Image.pixelArea();
+var snowAreaDict = snowClass.eq(2).multiply(pixelArea).reduceRegion({
+  reducer: ee.Reducer.sum(),
+  geometry: aoi.geometry(),
+  scale: 30,
+  maxPixels: 1e13
+});
+var snowArea = ee.Number(snowAreaDict.values().get(0)).divide(1e6);
+
+var nonSnowAreaDict = snowClass.eq(1).multiply(pixelArea).reduceRegion({
+  reducer: ee.Reducer.sum(),
+  geometry: aoi.geometry(),
+  scale: 30,
+  maxPixels: 1e13
+});
+var nonSnowArea = ee.Number(nonSnowAreaDict.values().get(0)).divide(1e6);
+
+var totalArea = snowArea.add(nonSnowArea);
+
+print('Snow-covered area (sq km):', snowArea);
+print('Non-snow-covered area (sq km):', nonSnowArea);
+print('Total area (sq km):', totalArea);
+
+// Export the classified image
+Export.image.toDrive({
+  image: snowClass,
+  description: 'Snow_Classification',
+  scale: 30,
+  region: aoi.geometry(),
+  fileFormat: 'GeoTIFF'
+});
+
+
+
+
+
+// For available Snow products like MODIS
+var modisNDSI = ee.ImageCollection(MODIS)
+  .select('NDSI_Snow_Cover')
+  .filterBounds(aoi)
+  .filterDate('2024-02-01', '2024-02-28')
+  .mean()
+  .multiply(0.01)
+  .clip(aoi);
+                  
+Map.addLayer(modisNDSI, {min:0, max:1, palette: ['green', 'white']}, 'MODIS NDSI');
+                  
+// Apply thresholding (0.27) and classify pixels into snow (2) and non-snow (1)
+var modisSnowClass = modisNDSI.gt(0.27).multiply(1).add(1);
+
+// Add classified image to the map
+Map.addLayer(modisSnowClass, {min: 1, max: 2, palette: ['green', 'white']}, 'Snow Classification');
+
+
+// Calculate the area under snow pixels and non-snow pixels for MODIS
+var pixelArea = ee.Image.pixelArea();
+var snowAreaDict = modisSnowClass.eq(2).multiply(pixelArea).reduceRegion({
+  reducer: ee.Reducer.sum(),
+  geometry: aoi.geometry(),
+  scale: 30,
+  maxPixels: 1e13
+});
+var snowArea = ee.Number(snowAreaDict.values().get(0)).divide(1e6);
+
+
+var modisSnowAreaDict = modisSnowClass.eq(2).multiply(pixelArea).reduceRegion({
+  reducer: ee.Reducer.sum(),
+  geometry: aoi.geometry(),
+  scale: 500,
+  maxPixels: 1e13
+});
+var modisSnowArea = ee.Number(modisSnowAreaDict.values().get(0)).divide(1e6);
+
+var modisNonSnowAreaDict = modisSnowClass.eq(1).multiply(pixelArea).reduceRegion({
+  reducer: ee.Reducer.sum(),
+  geometry: aoi.geometry(),
+  scale: 500,
+  maxPixels: 1e13
+});
+var modisNonSnowArea = ee.Number(modisNonSnowAreaDict.values().get(0)).divide(1e6);
+
+var modisTotalArea = modisSnowArea.add(modisNonSnowArea);
+
+print('MODIS Snow-covered area (sq km):', modisSnowArea);
+print('MODIS Non-snow-covered area (sq km):', modisNonSnowArea);
+print('MODIS Total area (sq km):', modisTotalArea);
+
+// Export the classified image
+Export.image.toDrive({
+  image: modisSnowClass,
+  description: 'Snow_MODIS',
+  scale: 500,
+  region: aoi.geometry(),
+  fileFormat: 'GeoTIFF'
+});

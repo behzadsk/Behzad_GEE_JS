@@ -1,0 +1,154 @@
+// Retrieve the last date from the SPEI dataset.
+var dataset = ee.ImageCollection("CSIC/SPEI/2_9").
+  filterDate('1990-01-01', '2023-12-30');
+
+// Select the 24-month analysis.
+var spei01 = dataset.select('SPEI_01_month').mosaic().clip(aoi);
+var spei03 = dataset.select('SPEI_03_month').mosaic().clip(aoi);
+var spei06 = dataset.select('SPEI_06_month').mosaic().clip(aoi);
+var spei09 = dataset.select('SPEI_09_month').mosaic().clip(aoi);
+var spei12 = dataset.select('SPEI_12_month').mosaic().clip(aoi);
+var spei24 = dataset.select('SPEI_24_month').mosaic().clip(aoi);
+var spei36 = dataset.select('SPEI_36_month').mosaic().clip(aoi);
+var spei48 = dataset.select('SPEI_48_month').mosaic().clip(aoi);
+// Set the visualization ranges and color palette.
+var visParams = {
+  min: -2.33,
+  max:  2.33,
+  palette: [
+    '8b1a1a', 'de2929', 'f3641d',
+    'fdc404', '9afa94', '03f2fd',
+    '12adf3', '1771de', '00008b',
+  ]
+};
+
+
+
+// Display the SPEI 24-month layer.
+Map.addLayer(spei03, visParams, 'SPEI 03 month');
+Map.addLayer(spei06, visParams, 'SPEI 06 month');
+Map.addLayer(spei09, visParams, 'SPEI 09 month');
+Map.addLayer(spei12, visParams, 'SPEI 12 month');
+
+
+
+
+// Load the SPEI dataset
+var dataset = ee.ImageCollection("CSIC/SPEI/2_9")
+  .filterDate('1990-01-01', '2020-12-31');
+
+// Sample 500 random points within the AOI
+var points = ee.FeatureCollection.randomPoints(aoi, 500);
+
+// Function to get SPEI values for each point
+var extractSPEI = function(point) {
+  var spei06 = dataset.select('SPEI_06_month').map(function(image) {
+    var speiValue = image.reduceRegion({
+      reducer: ee.Reducer.mean(),
+      geometry: point.geometry(),
+      scale: 1000
+    }).get('SPEI_06_month');
+    return point.set('date', image.date().format('YYYY-MM-dd')).set('SPEI_06', speiValue);
+  });
+  
+  var spei12 = dataset.select('SPEI_12_month').map(function(image) {
+    var speiValue = image.reduceRegion({
+      reducer: ee.Reducer.mean(),
+      geometry: point.geometry(),
+      scale: 1000
+    }).get('SPEI_12_month');
+    return point.set('date', image.date().format('YYYY-MM-dd')).set('SPEI_12', speiValue);
+  });
+  
+  return spei06.merge(spei12);
+};
+
+// Extract SPEI values for all points
+var speiValues = points.map(extractSPEI).flatten();
+
+// Export the results to a CSV file
+Export.table.toDrive({
+  collection: speiValues,
+  description: 'SPEI_1990_2020',
+  fileFormat: 'CSV'
+});
+
+// Print to the console (optional, for debugging)
+print(speiValues);
+
+
+Export.image.toDrive({
+  image:spei01, 
+  description:'SPEI_01', 
+  region:aoi, scale:55660, 
+  crs:'EPSG:4326', 
+  maxPixels:1e13
+})
+
+
+Export.image.toDrive({
+  image:spei03, 
+  description:'SPEI_03', 
+  region:aoi, scale:55660, 
+  crs:'EPSG:4326', 
+  maxPixels:1e13
+})
+
+
+Export.image.toDrive({
+  image:spei06, 
+  description:'SPEI_06', 
+  region:aoi, scale:55660, 
+  crs:'EPSG:4326', 
+  maxPixels:1e13
+})
+ 
+Export.image.toDrive({
+  image:spei09, 
+  description:'SPEI_09', 
+  region:aoi, scale:55660, 
+  crs:'EPSG:4326', 
+  maxPixels:1e13
+})
+ 
+Export.image.toDrive({
+  image:spei12, 
+  description:'SPEI_12', 
+  region:aoi, scale:55660, 
+  crs:'EPSG:4326', 
+  maxPixels:1e13
+})
+ 
+Export.image.toDrive({
+  image:spei16, 
+  description:'SPEI_16', 
+  region:aoi, scale:55660, 
+  crs:'EPSG:4326', 
+  maxPixels:1e13
+})
+
+Export.image.toDrive({
+  image:spei24, 
+  description:'SPEI_24', 
+  region:aoi, scale:55660, 
+  crs:'EPSG:4326', 
+  maxPixels:1e13
+})
+ 
+Export.image.toDrive({
+  image:spei36, 
+  description:'SPEI_36', 
+  region:aoi, scale:55660, 
+  crs:'EPSG:4326', 
+  maxPixels:1e13
+})
+
+Export.image.toDrive({
+  image:spei48, 
+  description:'SPEI_48', 
+  region:aoi, scale:55660, 
+  crs:'EPSG:4326', 
+  maxPixels:1e13
+})
+ 
+ 

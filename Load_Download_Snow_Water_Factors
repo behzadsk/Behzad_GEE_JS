@@ -1,0 +1,116 @@
+
+var startdate = '2024-01-01';
+var enddate =  '2024-01-30';
+
+//Datasets section
+
+var era5_dataset = ee.ImageCollection("ECMWF/ERA5_LAND/DAILY_AGGR")
+                     .filterDate(startdate, enddate)
+                     .filterBounds(studyarea);
+
+var snow_density = era5_dataset.select('snow_density').mean().clip(studyarea)
+print("Snow Density" ,snow_density);
+Map.addLayer(snow_density, {palette: ['Green', 'Yellow', 'Red']} ,"Snow Density");
+
+var snow_depth = era5_dataset.select('snow_depth').mean().clip(studyarea);
+print("Snow Depth" ,snow_depth);
+Map.addLayer(snow_depth, {palette: ['Green', 'Yellow', 'Red']}, "Snow Depth");
+
+var snow_water_equivalent = era5_dataset.select('snow_depth_water_equivalent').mean().clip(studyarea);
+print("Snow Water Equivalent" ,snow_water_equivalent);
+Map.addLayer(snow_water_equivalent, {palette: ['Green', 'Yellow', 'Red']}, "Snow Water Equivalent");
+
+var temperature_2m_min = era5_dataset.select('temperature_2m_min').mean().subtract(273.15).clip(studyarea);
+print("Air Temperature at 2m min" ,temperature_2m_min);
+Map.addLayer(temperature_2m_min, {min:-25, max: 15 , palette: ['Green', 'Yellow', 'Red']}, "Air Temperature at 2m min");
+
+var temperature_2m_max = era5_dataset.select('temperature_2m_max').mean().subtract(273.15).clip(studyarea);
+print("Air Temperature at 2m max" ,temperature_2m_max);
+Map.addLayer(temperature_2m_max, {min:-25, max: 0 ,palette: ['Green', 'Yellow', 'Red']}, "Air Temperature at 2m max");
+
+
+
+// Albedo
+
+
+var snowAlbedo = ee.ImageCollection("MODIS/061/MCD43A2")
+                   .filterDate(startdate, enddate)
+                   .filterBounds(studyarea)
+                   .select('Snow_BRDF_Albedo')
+                   .mean().clip(studyarea);
+
+print("Snow Albedo",snowAlbedo);
+Map.addLayer(snowAlbedo, {min:0, max: 1, palette: ['Green',  'Red']}, "Snow ALbedo");
+
+
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+//Export Section
+
+Export.image.toDrive({
+  image:snow_density, 
+  description: 'snow_density',  
+  region: studyarea, 
+  scale:11132, 
+  crs:'EPSG:4326', 
+  maxPixels:1e13
+});
+
+Export.image.toDrive({
+  image:snow_depth, 
+  description: 'snow_depth',  
+  region: studyarea, 
+  scale:11132, 
+  crs:'EPSG:4326', 
+  maxPixels:1e13
+});
+
+Export.image.toDrive({
+  image:snow_water_equivalent, 
+  description: 'snow_water_equivalent',  
+  region: studyarea, 
+  scale:11132, 
+  crs:'EPSG:4326', 
+  maxPixels:1e13
+});
+
+
+Export.image.toDrive({
+  image:temperature_2m_min, 
+  description: 'temperature_2m_min',  
+  region: studyarea, 
+  scale:11132, 
+  crs:'EPSG:4326', 
+  maxPixels:1e13
+});
+
+Export.image.toDrive({
+  image:temperature_2m_max, 
+  description: 'temperature_2m_max',  
+  region: studyarea, 
+  scale:11132, 
+  crs:'EPSG:4326', 
+  maxPixels:1e13
+});
+
+Export.image.toDrive({
+  image:snowAlbedo, 
+  description: 'snowAlbedo',  
+  region: studyarea, 
+  scale:500, 
+  crs:'EPSG:4326', 
+  maxPixels:1e13
+});
+
+
+
+
+
+
+
+
+
+

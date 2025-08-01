@@ -1,0 +1,17 @@
+// 2. Load SRTM DEM data
+var srtm = ee.Image("USGS/SRTMGL1_003");
+var srtmClipped = srtm.clip(studyArea);
+
+// 3. Visualization Parameters (optional)
+var srtmVis = {min: 0, max: 3000, palette: ['blue', 'green', 'brown', 'white']};
+Map.addLayer(srtmClipped, srtmVis, 'SRTM DEM');
+
+// 4. Export SRTM DEM to Google Drive
+Export.image.toDrive({
+  image: srtmClipped,
+  description: 'SRTM_DEM',
+  scale: 30,  // SRTM native resolution is 30m
+  region: studyArea,
+  fileFormat: 'GeoTIFF',
+  maxPixels: 1e13
+}); 

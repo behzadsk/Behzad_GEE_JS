@@ -1,0 +1,61 @@
+
+var aoi = table; // Give your shapefile path or import from assets in import section
+Map.centerObject(aoi);
+Map.addLayer(aoi)
+// Monthly time series rainfall data 
+var rainfall = ee.ImageCollection('UCSB-CHG/CHIRPS/DAILY')
+                .select('precipitation')
+                .filterDate('2024-01-01','2024-12-31')
+                .map(function(img){
+                  var d = ee.Date(ee.Number(img.get('system:time_start')));
+                  var m = ee.Number(d.get('month'));
+                  var y = ee.Number(d.get('year'));
+                  return img.set({'month': m, 'year': y});
+                });
+
+var months = ee.List.sequence(1, 12);
+var years = ee.List([2024]); 
+
+
+var byYearMonth = ee.ImageCollection.fromImages(
+      years.map(function(y){
+        return months.map(function(m) {
+            return rainfall.filterMetadata('year', 'equals', y)
+                        .filterMetadata('month', 'equals', m)
+                        .select('precipitation').sum()
+                        .set('year', y)
+                        .set('month', m)
+                        .set('date', ee.Date.fromYMD(y, m, 1));
+        });
+      }).flatten()
+);
+
+var proj = ee.Image(rainfall.first()).projection();
+
+var monthlySum = byYearMonth.map(function(img) {
+  var features = aoi.map(function(f) {
+    return f.set({
+      'date': img.get('date'), 
+      'month': img.get('month'), 
+      'year': img.get('year'),
+      'sum_precipitation': img.reduceRegion({
+        reducer: ee.Reducer.sum(),
+        geometry: f.geometry(),
+        scale: 5000,
+        maxPixels: 1e9
+      }).get('precipitation')
+    });
+  });
+  return features;
+}).flatten();
+
+print(monthlySum.limit(24));
+
+// Export the FeatureCollection
+Export.table.toDrive({
+  collection: monthlySum, 
+  description: 'CRB_Rainfall_monthly_2024', 
+  fileFormat: 'CSV'
+});
+
+print("Export Rainfall");

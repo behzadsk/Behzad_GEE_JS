@@ -1,0 +1,26 @@
+Map.centerObject(studyArea, 10);
+Map.addLayer(studyArea, {color: 'red'}, 'Study Area');
+
+// 3. Load Sentinel-2 Image Collection and Filter
+var collection =imageCollection
+  .filterDate("2014-08-01", "2014-08-30")
+  .filterBounds(studyArea)
+  .median()
+  .select('NDVI')
+  .multiply(0.0001);
+
+var ndviClipped = collection.clip(studyArea);
+
+// 6. Visualization Parameters
+var ndviParams = {min: 0, max: 1, palette: ['white', 'green']};
+Map.addLayer(ndviClipped, ndviParams, 'NDVI');
+
+// 7. Export NDVI to Google Drive
+Export.image.toDrive({
+  image: ndviClipped,
+  description: 'NDVI',
+  scale: 250,
+  region: studyArea,
+  fileFormat: 'GeoTIFF',
+  maxPixels: 1e13
+});

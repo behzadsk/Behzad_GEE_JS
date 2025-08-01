@@ -1,0 +1,65 @@
+
+// Clip the DEM to the study area
+var clippedDEM = srtm.clip(studyArea);
+
+// Visualize the clipped DEM
+Map.addLayer(clippedDEM, {min: 0, max: 5000, palette: ['blue', 'green', 'yellow', 'red']}, 'Elevation');
+
+
+/////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+// Calculate the slope from the DEM (in degrees)
+var slope = ee.Terrain.slope(clippedDEM);
+
+// Visualize the slope
+Map.addLayer(slope, {min: 0, max: 45, palette: ['green', 'yellow', 'red']}, 'Slope');
+
+
+/////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+
+
+// Calculate the aspect from the DEM (in degrees)
+var aspect = ee.Terrain.aspect(clippedDEM);
+
+// Visualize the aspect
+Map.addLayer(aspect, {min: 0, max: 360, palette: ['blue', 'cyan', 'green', 'yellow', 'red']}, 'Aspect');
+
+
+/////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+
+// Define a 3x3 kernel for the neighborhood operation (moving window)
+var kernel = ee.Kernel.square(1, 'pixels');  // 3x3 window (1-pixel radius)
+
+// Compute Focal Mean (mean of values in the 3x3 neighborhood)
+var focalMean = clippedDEM.reduceNeighborhood({
+  reducer: ee.Reducer.mean(),  // Focal mean
+  kernel: kernel  // Use the 3x3 kernel
+});
+
+// Compute Focal Maximum (maximum of values in the 3x3 neighborhood)
+var focalMax = clippedDEM.reduceNeighborhood({
+  reducer: ee.Reducer.max(),  // Focal max
+  kernel: kernel  // Use the 3x3 kernel
+});
+
+// Compute Focal Minimum (minimum of values in the 3x3 neighborhood)
+var focalMin = clippedDEM.reduceNeighborhood({
+  reducer: ee.Reducer.min(),  // Focal min
+  kernel: kernel  // Use the 3x3 kernel
+});
+
+// Calculate TRI using the formula: (Focal Mean - Focal Min) / (Focal Max - Focal Min)
+var TRI = focalMean.subtract(focalMin).divide(focalMax.subtract(focalMin));
+
+// Visualize the TRI
+Map.addLayer(TRI, {min: 0, max: 1, palette: ['blue', 'green', 'yellow', 'red']}, 'TRI');
+
+
+/////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+
+// Add the study area outline as a layer
+Map.addLayer(studyArea, {color: 'black', fillOpacity: 0, width: 2}, 'Study Area Outline');
+

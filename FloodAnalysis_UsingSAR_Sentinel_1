@@ -1,0 +1,63 @@
+
+
+//Collecting Sentinel 1 GRD SAR Images for study Area
+
+var collection = ee.ImageCollection('COPERNICUS/S1_GRD')
+        .filterBounds (Pakistan)
+        .filter(ee.Filter.listContains('transmitterReceiverPolarisation', 'VV'))
+        .filter(ee.Filter.eq('instrumentMode', 'IW'))
+        .select('VV')
+        
+//Selecting Dates as before and after for flood hit images
+
+var before_flood = collection.filterDate('2021-07-18', '2021-08-20').mosaic() ; 
+var after_flood = collection.filterDate('2022-07-18', '2022-08-20').mosaic() ; 
+
+//Extract images for dates and AOI
+
+var image_Before = before_flood.clip(Pakistan)
+var image_After = after_flood.clip(Pakistan)
+
+
+//Apply Smootheing Filter (Speckle Smoothing )
+
+var before_Smoothened = image_Before.focalMedian(20, 'circle', 'meters')
+var after_Smoothened = image_After.focalMedian(20, 'circle', 'meters')
+
+// difference between before and after flood images
+
+var difference = after_Smoothened.subtract(before_Smoothened)
+
+
+//now get the values which are less than (-3).
+
+var flood_extent = difference.lt(-3)
+
+//store flood values in new layer
+
+var flood = flood_extent.updateMask(flood_extent)
+
+
+//Show/display all the outputs/maps
+
+Map.addLayer(Pakistan, {}, "Study Area");
+Map.addLayer(image_Before, {min: -30, max: 0}, "Before Flood Image");
+Map.addLayer(image_After , {min: -30, max: 0}, "After Flood Image" );
+Map.addLayer(difference ,{} ,"Difference");
+Map.addLayer(flood_extent, {} , "Flood Extent");
+Map.addLayer(flood ,{} , "Flood induntation");
+
+Export.image.toDrive ({
+  image: flood.float(),
+  description : "Flood Analysis for HyderAbad",
+  scale : 10,
+  maxPixels : 1e13,
+  region : table,
+  crs : "EPSG :4326"
+  
+})
+
+
+
+
+

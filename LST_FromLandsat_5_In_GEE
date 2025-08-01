@@ -1,0 +1,97 @@
+
+//Images filteration Section
+
+var collectionName = LC5;
+var dataset = ee.ImageCollection(collectionName)
+  .filterBounds(studyArea)
+  .filterDate('2000-08-01', '2000-09-30')
+  .filterMetadata('CLOUD_COVER', 'less_than', 10); 
+
+print( "Total Images Available", dataset)
+var completerawdatasetmosaic = dataset.mosaic().clip(studyArea);
+Map.addLayer(completerawdatasetmosaic, {}, "All Images Found Dataset composite")
+
+
+// Function to filter and sort images by a target ID and cloud cover
+function filterAndSortByCloud(targetID) {
+  return dataset
+    .filter(ee.Filter.stringContains('system:index', targetID))
+    .sort('CLOUD_COVER');
+}
+
+
+var images149038 = filterAndSortByCloud('149038');
+var images149039 = filterAndSortByCloud('149039');
+var images150038 = filterAndSortByCloud('150038');
+var images150039 = filterAndSortByCloud('150039');
+var images151038 = filterAndSortByCloud('151038');
+var images151039 = filterAndSortByCloud('151039');
+
+print("Images 149038 sorted by Cloud Cover:", images149038);
+print("Images 149039 sorted by Cloud Cover:", images149039);
+print("Images 150038 sorted by Cloud Cover:", images150038);
+print("Images 150039 sorted by Cloud Cover:", images150039);
+print("Images 151038 sorted by Cloud Cover:", images151038);
+print("Images 151039 sorted by Cloud Cover:", images151039);
+
+var sortedImages = images149038.merge(images149039.first())
+                               .merge(images150038.first())
+                               .merge(images150039.first())
+                               .merge(images151038.first())
+                               .merge(images151039.first())
+                               .select(['B1', 'B2', 'B3', 'B4', 'B5', 'B6', 'B7']); 
+
+var composite = sortedImages.mosaic().clip(studyArea);
+
+
+var compositeUint16 = composite.toUint16();
+
+// Display the composite of sorted images
+Map.addLayer(compositeUint16, {bands: ['B4', 'B3', 'B2'], min: 0, max: 65565}, 'Composite of Sorted Images by Cloud Cover');
+
+print("Composite of Sorted Images by Cloud Cover:", composite);
+
+
+
+//  Step 1: Create Mosaic of Thermal Band (B6)
+
+var thermalMosaic = sortedImages.select('B6').mosaic().clip(studyArea);
+
+
+// Step 2: Convert to Brightness Temperature (TOA)
+
+// Constants for Landsat 5 (TOA)
+var k1 = 607.76;
+var k2 = 1260.56;
+
+// Convert TOA Radiance to Brightness Temperature
+var bt = thermalMosaic.expression(
+  '(K2 / log((K1 / L) + 1)) - 273.15', {
+    'L': thermalMosaic,  // TOA Radiance
+    'K1': k1,
+    'K2': k2
+}).rename('BT');
+
+
+// Step 3: Calculate NDVI from the composite
+
+var ndvi = composite.normalizedDifference(['B4', 'B3']).rename('NDVI');
+
+
+// Step 4: Estimate Emissivity using NDVI
+
+var pv = ndvi.subtract(0.2).divide(0.3).pow(2).rename('PV');
+pv = pv.where(pv.gt(1), 1).where(pv.lt(0), 0);
+
+var emissivity = pv.multiply(0.004).add(0.986).rename('Emissivity');
+
+// Step 5: Calculate LST in Celsius
+
+var lst = bt.divide(emissivity).rename('LST');
+
+
+// Step 6: Add Layers to Map
+
+Map.addLayer(bt, {min: 20, max: 45, palette: ['blue', 'green', 'yellow', 'red']}, 'Brightness Temp (°C)');
+Map.addLayer(lst, {min: 20, max: 45, palette: ['blue', 'green', 'yellow', 'red']}, 'LST (°C)');
+Map.addLayer(ndvi, {min: -1, max: 1, palette: ['white', 'green']}, 'NDVI');

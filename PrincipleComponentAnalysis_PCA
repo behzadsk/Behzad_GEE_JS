@@ -1,0 +1,51 @@
+// Filter ESA CCI Soil Moisture data for the whole year of 2024
+var soilMoisture = ee.ImageCollection("NASA/SMAP/SPL4SMGP/007")
+                    .select('sm_surface')
+                    .filterBounds(geometry)
+                    .filterDate('2024-01-01', '2024-12-31')  // Filter for 2024
+                    .mean();  // Take the mean soil moisture over time
+
+// Filter MODIS Land Cover data for August 2024
+var landCover = ee.ImageCollection('MODIS/006/MCD12Q1')
+                    .filterBounds(geometry)
+                    .filterDate('2024-08-01', '2024-08-31')  // Filter for August 2024
+                    .select('LC_Type1')
+                    .mean();  // Take the mean land cover type over time
+
+// Filter CHIRPS Precipitation data for the whole year of 2024
+var precipitation = ee.ImageCollection('UCSB-CHG/CHIRPS/PENTAD')
+                       .filterBounds(geometry)
+                       .filterDate('2024-01-01', '2024-12-31')  // Filter for 2024
+                       .mean();  // Take the mean precipitation over time
+
+// Stack the data into a single image for PCA
+var stackedData = srtm.addBands([soilMoisture, landCover, precipitation]);
+
+// Convert the stacked data to an array (needed for PCA)
+var arrayData = stackedData.toArray();
+
+// Compute the covariance matrix for the stacked bands
+var covarianceMatrix = arrayData.reduceRegion({
+  reducer: ee.Reducer.covariance(),
+  geometry: geometry,
+  scale: 30,
+  maxPixels: 1e8
+}).get('array');
+
+// Perform eigen decomposition on the covariance matrix
+var eigen = ee.Array(covarianceMatrix).eigen();
+
+// Extract the first principal component (PC1) by slicing the array
+var pcs = eigen.slice(1, 0, 1);  // Extract first principal component (PC1)
+
+// Convert PC1 to an image and visualize
+var pc1 = ee.Image(pcs).arrayFlatten([['PC1']]);
+
+// Visualize the first principal component (PC1)
+Map.addLayer(pc1, {min: -100, max: 100, palette: ['blue', 'green', 'red']}, 'PC1');
+
+
+// Print the eigenvalues for debugging
+var eigenvalues = eigen.slice(1, 1, 2);  // Extract eigenvalues
+print('Eigenvalues:', eigenvalues);
+

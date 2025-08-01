@@ -1,0 +1,48 @@
+// Import the IMERG dataset.
+
+
+// Define the time range and region of interest.
+var startDate = ee.Date('2001-01-01');
+var endDate = ee.Date('2001-03-30');
+
+
+// Filter the dataset based on the time and region.
+var imergFiltered = ee.ImageCollection("NASA/GPM_L3/IMERG_MONTHLY_V06")
+  .filterDate(startDate, endDate)
+  .filterBounds(region)
+  .select('precipitation');
+
+// Print the filtered collection.
+print(imergFiltered);
+//Map.addLayer(imergFiltered, {palette: ['green', 'blue', 'yellow', 'red'] }, 'GPM Filtered')
+var Boundarystyling = {color:'Black', fillColor:'#ffffff00'}
+Map.addLayer(region.style(Boundarystyling),{}, 'Study Area')
+
+var studyAreaPrecipitation = imergFiltered.sum().clip(region)
+print('Study Area Precipitation', studyAreaPrecipitation)
+Map.addLayer(studyAreaPrecipitation, {palette: ['green', 'blue', 'yellow', 'red'] }, 'GPM StudyArea Precipitation')
+
+
+
+// Create a time series chart.
+var chart = ui.Chart.image.seriesByRegion({
+  imageCollection: imergFiltered,
+  regions: region,
+  reducer: ee.Reducer.mean(),
+  band: 'precipitation',
+  scale: 10000,
+  xProperty: 'system:time_start'
+});
+
+// Display the chart.
+print(chart);
+
+
+
+Export.image.toDrive({
+  image: studyAreaPrecipitation,
+  description: 'GPM_precipitation',
+  scale: 10000, 
+  region: region,
+  maxPixels: 1e13 
+});

@@ -1,0 +1,128 @@
+
+
+
+// Function to calculate monthly precipitation for a given time range
+function calculateMonthlyPrecip(startDate, endDate) {
+  var chirps = ee.ImageCollection('UCSB-CHG/CHIRPS/DAILY')
+                .filterDate(startDate, endDate)
+                .filterBounds(aoi)
+                .map(function(image) {
+                  return image.clip(aoi);
+                });
+
+  var months = ee.List.sequence(0, ee.Date(endDate).difference(ee.Date(startDate), 'month').subtract(1))
+               .map(function(n) {
+                 var start = ee.Date(startDate).advance(n, 'month');
+                 var end = start.advance(1, 'month');
+                 var monthlySum = chirps.filterDate(start, end).sum();
+                 return monthlySum.set('system:time_start', start).set('system:time_end', end);
+               });
+
+  return ee.ImageCollection.fromImages(months);
+}
+
+// Calculate monthly precipitation for smaller chunks to handle larger date ranges
+var monthlyPrecip1 = calculateMonthlyPrecip('2020-01-01', '2020-06-30');
+var monthlyPrecip2 = calculateMonthlyPrecip('2020-07-01', '2020-12-31');
+
+// Merge the smaller chunks into one ImageCollection
+var monthlyPrecip = monthlyPrecip1.merge(monthlyPrecip2);
+
+// Function to get the min and max for a single image
+var minMaxReducer = function(image, previous) {
+  var minVal = image.reduceRegion({
+    reducer: ee.Reducer.min(),
+    geometry: aoi,
+    scale: 5000,
+    bestEffort: true
+  }).get('precipitation');
+
+  var maxVal = image.reduceRegion({
+    reducer: ee.Reducer.max(),
+    geometry: aoi,
+    scale: 5000,
+    bestEffort: true
+  }).get('precipitation');
+
+  // Update the min and max values
+  previous = ee.Dictionary(previous);
+  return ee.Dictionary({
+    min: ee.Number(previous.get('min')).min(minVal),
+    max: ee.Number(previous.get('max')).max(maxVal)
+  });
+};
+
+// Initialize with very high and very low values
+var initial = ee.Dictionary({
+  min: 1e9,
+  max: -1e9
+});
+
+// Reduce the collection to get overall min and max values
+var minMax = monthlyPrecip.iterate(minMaxReducer, initial);
+
+// Extract the min and max values
+minMax = ee.Dictionary(minMax);
+var overallMin = ee.Number(minMax.get('min'));
+var overallMax = ee.Number(minMax.get('max'));
+print('Overall Minimum Monthly Precipitation:', overallMin);
+print('Overall Maximum Monthly Precipitation:', overallMax);
+
+// Function to calculate SPI
+function calculateSPI(collection, scale) {
+  var spi = collection.map(function(image) {
+    // Get the mean and standard deviation for the rolling window
+    var startDate = ee.Date(image.get('system:time_start')).advance(-scale, 'month');
+    var endDate = ee.Date(image.get('system:time_start'));
+    var filtered = collection.filterDate(startDate, endDate);
+    var mean = filtered.mean();
+    var stdDev = filtered.reduce(ee.Reducer.stdDev());
+
+    // Ensure mean and stdDev have valid bands
+    mean = ee.Image(ee.Algorithms.If(mean.bandNames().size(), mean, ee.Image.constant(0)));
+    stdDev = ee.Image(ee.Algorithms.If(stdDev.bandNames().size(), stdDev, ee.Image.constant(1)));
+
+    // Calculate SPI
+    var spi = image.subtract(mean).divide(stdDev);
+
+    // Normalize SPI to range 0-1
+    var normalizedSPI = spi.subtract(overallMin).divide(overallMax.subtract(overallMin));
+
+    // Set properties
+    return ee.Image(normalizedSPI)
+      .set('system:time_start', image.get('system:time_start'))
+      .set('month', image.get('month'))
+      .set('year', image.get('year'))
+      .clip(aoi);
+  });
+
+  return ee.ImageCollection(spi);
+}
+
+// Calculate normalized SPI for 3, 6, 9, and 12 months
+var spi3 = calculateSPI(monthlyPrecip, 3);
+var spi6 = calculateSPI(monthlyPrecip, 6);
+var spi9 = calculateSPI(monthlyPrecip, 9);
+var spi12 = calculateSPI(monthlyPrecip, 12);
+
+// Print the normalized SPI collections to check
+print('Normalized SPI-3', spi3);
+print('Normalized SPI-6', spi6);
+print('Normalized SPI-9', spi9);
+print('Normalized SPI-12', spi12);
+
+// Define visualization parameters for normalized SPI
+var visParamsNormalized = {
+  min: 0,
+  max: 1,
+  palette: ['blue', 'white', 'red']
+};
+
+// Add normalized SPI layers for visualization
+Map.addLayer(spi3.mean(), visParamsNormalized, 'Normalized SPI-3');
+Map.addLayer(spi6.mean(), visParamsNormalized, 'Normalized SPI-6');
+Map.addLayer(spi9.mean(), visParamsNormalized, 'Normalized SPI-9');
+Map.addLayer(spi12.mean(), visParamsNormalized, 'Normalized SPI-12');
+
+// Set the center of the map
+Map.setCenter(69.3451, 30.3753, 5); // Center over Pakistan

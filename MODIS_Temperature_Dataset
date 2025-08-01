@@ -1,0 +1,72 @@
+
+//As Uusal laoding dataset
+// MODIS 9 don't have Thermal infrared band which is used to calculate LST.
+//Rather it provide LST daily data collection in MODIS 11 with 1km pixel resolution
+var collection = ee.ImageCollection("MODIS/061/MOD11A1") // MODIS "MODIS/061/MOD11A1"
+.filterDate('2024-10-01', '2024-10-30')   //for air temperature band is "air"
+.select('LST_Day_1km') // there exist many bands we will get the LST daily band for our study. check the dataset properties.
+Map.addLayer(collection, {min: 12801, max: 15618, palette:['Blue',' Green', 'Yellow', 'Red']}, 'MODIS Daily LST')
+
+
+// as in NDSI from MODIS 10, in MODIS 11 there exist pixels which are masked out.
+// so, first we will fill out the pixels using interpolation technique.
+
+
+
+// Function to fill masked pixels using a neighborhood reducer
+var fillMaskedPixels = function(image) {
+  // Create a kernel to represent the neighborhood
+  var kernel = ee.Kernel.square({
+    radius: 16,
+    units: 'pixels',
+    normalize: true
+  });
+  
+// above function is cerated to generate the environment (extent) for the interpolation.
+// this means that focal mean function defined below will work under the parameters defined above in kernel function.
+
+/////////////************************************//////////////////////////////////////////////////////
+
+  // Use a neighborhood reducer to fill masked pixels
+  var filledImage = image.focal_mean({
+    kernel: kernel, 
+    iterations: 1, // Adjust as needed
+    units: 'meters',
+// once kernel is defined or used from somewhere in the code, (continue)
+//there will be no need to define kernelType, radius, unit arguments of focalmean function. (continue)
+//and we have defined the kernel(extent of looking for values pixels) in the above function (continue)
+//check in docs (search focal mean and check properties description of it)
+  });
+
+  // Return the image with filled pixels
+  return image.unmask(filledImage);
+};
+
+// Apply the fillMaskedPixels function to each image in the collection
+var LSTFilled = collection.map(fillMaskedPixels);
+
+
+var LSTmeanFilled = LSTFilled.mean().clip(studyArea);
+Map.addLayer(LSTmeanFilled,{min: 12750  , max: 14480, palette:['Blue',' Green', 'Yellow', 'Red']} , 'Interpolated Monthly Mean LST');
+
+///////////////////////////////////////////////////////////////////////////////
+
+
+
+var LST = LSTmeanFilled.multiply(0.02).subtract(273.15);
+Map.addLayer(LST, {min: -20  , max: 35, palette:['Blue',' Green', 'Yellow', 'Red']}, 'Monthly Mean LST')
+
+
+
+///////////////////////////////////////////////////////////////////////////////
+
+
+Export.image.toDrive({
+    image:LST ,
+    description:'LST',
+    region: studyArea,
+    scale: 1000,
+    crs: 'EPSG:4326',
+    maxPixels:1e13, 
+  
+});
